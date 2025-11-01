@@ -20,6 +20,21 @@
         .diamond.unchecked {
             background-color: #9ca3af;
         }
+        .fate-die {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #4b5563;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            margin: 4px;
+        }
+        .fate-plus { color: #10b981; }
+        .fate-minus { color: #ef4444; }
+        .fate-blank { color: #6b7280; }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen p-4">
@@ -47,7 +62,7 @@
             ["Меткость", "Разум", "Проницательность", "", ""]
           ],
           "extras": "",
-          "stunts": "1) Взломщик (тихий взлом через скрытность)\n2) Опытный карманник (за 1 жетон без проверки незаметно забираешь мелкий предмет)\n3) Глупая шутка (эта шутка настолько плоха, что даже хороша -- вызывает безудержный поток хохота)",
+          "stunts": "1. Взломщик (тихий взлом через скрытность)\n2. Опытный карманник (за 1 жетон без проверки незаметно забираешь мелкий предмет)\n3. Глупая шутка (эта шутка настолько плоха, что даже хороша -- вызывает безудержный поток хохота)",
           "physicalStress": [false, false, false],
           "mentalStress": [false, false, false],
           "unnamedStress": [false, false, false, false, false],
@@ -56,7 +71,7 @@
             "moderate": "",
             "severe": ""
           },
-          "inventory": "0)Книга с черными страницами\n1)Метательные ножи (6 шт)\n2)Отмычки\n3)Серебряное распятие",
+          "inventory": "0. Книга с черными страницами\n1. Метательные ножи (6 шт)\n2. Отмычки\n3. Серебряное распятие",
           "tokens": [true, true, true, false, false, false, false, false, false, false]
         };
 
@@ -71,11 +86,14 @@
                 stress: true,
                 consequences: true,
                 inventory: true,
-                tokens: true
+                tokens: true,
+                dice: true
             });
 
             const [characterData, setCharacterData] = useState(defaultCharacterData);
-
+            const [diceCount, setDiceCount] = useState(4);
+            const [currentRoll, setCurrentRoll] = useState(null);
+            const [rollHistory, setRollHistory] = useState([]);
             const fileInputRef = useRef(null);
             const menuRef = useRef(null);
             const [menuOpen, setMenuOpen] = useState(false);
@@ -161,14 +179,18 @@
 
             const exportToJSON = () => {
                 const dataStr = JSON.stringify(characterData, null, 2);
-                const dataUri = 'application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
                 
                 const exportFileDefaultName = `${characterData.name.replace(/\s+/g, '_')}.json`;
                 
                 const linkElement = document.createElement('a');
-                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('href', url);
                 linkElement.setAttribute('download', exportFileDefaultName);
                 linkElement.click();
+                
+                // Clean up
+                URL.revokeObjectURL(url);
                 setMenuOpen(false);
             };
 
@@ -195,6 +217,39 @@
             };
 
             const activeTokens = characterData.tokens.filter(token => token).length;
+
+            const getDieDisplay = (value) => {
+                if (value === 1) return '+';
+                if (value === -1) return '-';
+                return '•';
+            };
+
+            const getDieClass = (value) => {
+                if (value === 1) return 'fate-plus';
+                if (value === -1) return 'fate-minus';
+                return 'fate-blank';
+            };
+
+            const rollDice = () => {
+                const results = [];
+                let total = 0;
+                
+                for (let i = 0; i < diceCount; i++) {
+                    const roll = Math.floor(Math.random() * 3) - 1; // -1, 0, +1
+                    results.push(roll);
+                    total += roll;
+                }
+                
+                const rollData = {
+                    id: Date.now(),
+                    dice: results,
+                    total: total,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+                
+                setCurrentRoll(rollData);
+                setRollHistory(prev => [rollData, ...prev.slice(0, 9)]); // Keep last 10 rolls
+            };
 
             return (
                 <div className={`min-h-screen p-4 ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-black'}`}>
@@ -415,6 +470,80 @@
                                                     </div>
                                                 ))}
                                             </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Dice Block */}
+                            <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+                                <button 
+                                    onClick={() => toggleSection('dice')}
+                                    className={`w-full p-2 text-left font-bold ${darkMode ? 'bg-gray-800' : 'bg-gray-200'} flex justify-between items-center`}
+                                >
+                                    <span>КУБЫ</span>
+                                    <span>{expandedSections.dice ? '▼' : '▶'}</span>
+                                </button>
+                                {expandedSections.dice && (
+                                    <div className="p-4 space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">Количество кубов</label>
+                                            <select 
+                                                value={diceCount}
+                                                onChange={(e) => setDiceCount(parseInt(e.target.value))}
+                                                className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                                            >
+                                                {[1,2,3,4,5,6,7,8,9,10].map(num => (
+                                                    <option key={num} value={num}>{num}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        
+                                        <button 
+                                            onClick={rollDice}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                                        >
+                                            Бросить кубы
+                                        </button>
+                                        
+                                        {currentRoll && (
+                                            <div className="space-y-2">
+                                                <h4 className="font-medium">Результат броска:</h4>
+                                                <div className="flex flex-wrap justify-center">
+                                                    {currentRoll.dice.map((die, index) => (
+                                                        <div key={index} className={`fate-die ${getDieClass(die)}`}>
+                                                            {getDieDisplay(die)}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="text-center font-bold text-lg">
+                                                    Сумма: {currentRoll.total}
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {rollHistory.length > 0 && (
+                                            <div className="space-y-2">
+                                                <h4 className="font-medium">История бросков:</h4>
+                                                <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                    {rollHistory.map(roll => (
+                                                        <div key={roll.id} className="text-sm flex justify-between items-center bg-gray-800 p-2 rounded">
+                                                            <span>{roll.timestamp}</span>
+                                                            <span className="font-mono">Сумма: {roll.total}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="mt-4 p-3 bg-gray-800 rounded">
+                                            <h4 className="font-medium mb-2">Памятка по кубам FATE:</h4>
+                                            <ul className="text-sm space-y-1">
+                                                <li>1–2 на d6 = <span className="text-red-400 font-bold">-1</span></li>
+                                                <li>3–4 на d6 = <span className="text-gray-400 font-bold">0</span></li>
+                                                <li>5–6 на d6 = <span className="text-green-400 font-bold">+1</span></li>
+                                                <li>Стандартный бросок: 4 куба + модификатор навыка</li>
+                                            </ul>
                                         </div>
                                     </div>
                                 )}
