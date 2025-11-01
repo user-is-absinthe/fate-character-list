@@ -39,10 +39,8 @@
 </head>
 <body class="bg-gray-900 text-white min-h-screen p-4">
     <div id="root"></div>
-
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
-
         // Default character data from the uploaded file
         const defaultCharacterData = {
           "name": "Jack Pocket Knife",
@@ -74,7 +72,6 @@
           "inventory": "0. Книга с черными страницами\n1. Метательные ножи (6 шт)\n2. Отмычки\n3. Серебряное распятие",
           "tokens": [true, true, true, false, false, false, false, false, false, false]
         };
-
         function App() {
             const [darkMode, setDarkMode] = useState(true);
             const [expandedSections, setExpandedSections] = useState({
@@ -89,7 +86,6 @@
                 tokens: true,
                 dice: true
             });
-
             const [characterData, setCharacterData] = useState(defaultCharacterData);
             const [diceCount, setDiceCount] = useState(4);
             const [currentRoll, setCurrentRoll] = useState(null);
@@ -97,7 +93,6 @@
             const fileInputRef = useRef(null);
             const menuRef = useRef(null);
             const [menuOpen, setMenuOpen] = useState(false);
-
             // Close menu when clicking outside
             useEffect(() => {
                 const handleClickOutside = (event) => {
@@ -105,20 +100,17 @@
                         setMenuOpen(false);
                     }
                 };
-
                 document.addEventListener('mousedown', handleClickOutside);
                 return () => {
                     document.removeEventListener('mousedown', handleClickOutside);
                 };
             }, [menuOpen]);
-
             const toggleSection = (section) => {
                 setExpandedSections(prev => ({
                     ...prev,
                     [section]: !prev[section]
                 }));
             };
-
             const handleInputChange = (field, value, subField = null) => {
                 if (subField) {
                     setCharacterData(prev => ({
@@ -135,7 +127,6 @@
                     }));
                 }
             };
-
             const handleSkillChange = (row, col, value) => {
                 const newSkills = [...characterData.skills];
                 newSkills[row][col] = value;
@@ -144,7 +135,6 @@
                     skills: newSkills
                 }));
             };
-
             const handleCheckboxChange = (type, index, checked) => {
                 if (type === 'physicalStress') {
                     const newStress = [...characterData.physicalStress];
@@ -176,28 +166,22 @@
                     }));
                 }
             };
-
             const exportToJSON = () => {
                 const dataStr = JSON.stringify(characterData, null, 2);
                 const blob = new Blob([dataStr], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
-                
                 const exportFileDefaultName = `${characterData.name.replace(/\s+/g, '_')}.json`;
-                
                 const linkElement = document.createElement('a');
                 linkElement.setAttribute('href', url);
                 linkElement.setAttribute('download', exportFileDefaultName);
                 linkElement.click();
-                
                 // Clean up
                 URL.revokeObjectURL(url);
                 setMenuOpen(false);
             };
-
             const importFromJSON = (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
-                
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
@@ -210,47 +194,38 @@
                 reader.readAsText(file);
                 setMenuOpen(false);
             };
-
             const toggleTheme = () => {
                 setDarkMode(!darkMode);
                 setMenuOpen(false);
             };
-
             const activeTokens = characterData.tokens.filter(token => token).length;
-
             const getDieDisplay = (value) => {
                 if (value === 1) return '+';
                 if (value === -1) return '-';
                 return '•';
             };
-
             const getDieClass = (value) => {
                 if (value === 1) return 'fate-plus';
                 if (value === -1) return 'fate-minus';
                 return 'fate-blank';
             };
-
             const rollDice = () => {
                 const results = [];
                 let total = 0;
-                
                 for (let i = 0; i < diceCount; i++) {
                     const roll = Math.floor(Math.random() * 3) - 1; // -1, 0, +1
                     results.push(roll);
                     total += roll;
                 }
-                
                 const rollData = {
                     id: Date.now(),
                     dice: results,
                     total: total,
                     timestamp: new Date().toLocaleTimeString()
                 };
-                
                 setCurrentRoll(rollData);
                 setRollHistory(prev => [rollData, ...prev.slice(0, 9)]); // Keep last 10 rolls
             };
-
             return (
                 <div className={`min-h-screen p-4 ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-black'}`}>
                     {/* Header with hamburger menu */}
@@ -265,7 +240,6 @@
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                                 </svg>
                             </button>
-                            
                             {menuOpen && (
                                 <div className="absolute right-0 mt-2 w-64 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
                                     <div className="py-1">
@@ -291,12 +265,19 @@
                                                 className="hidden"
                                             />
                                         </label>
+                                        <a 
+                                            href="https://github.com/user-is-absinthe/fate-character-list"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block px-4 py-2 text-sm text-white hover:bg-gray-700 w-full text-left"
+                                        >
+                                            GitHub проекта
+                                        </a>
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
-
                     {/* Character Sheet */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column */}
@@ -333,7 +314,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Aspects Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -390,7 +370,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Extras Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -411,7 +390,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Stress Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -474,7 +452,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Dice Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -498,14 +475,12 @@
                                                 ))}
                                             </select>
                                         </div>
-                                        
                                         <button 
                                             onClick={rollDice}
                                             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
                                         >
                                             Бросить кубы
                                         </button>
-                                        
                                         {currentRoll && (
                                             <div className="space-y-2">
                                                 <h4 className="font-medium">Результат броска:</h4>
@@ -521,7 +496,6 @@
                                                 </div>
                                             </div>
                                         )}
-                                        
                                         {rollHistory.length > 0 && (
                                             <div className="space-y-2">
                                                 <h4 className="font-medium">История бросков:</h4>
@@ -535,7 +509,6 @@
                                                 </div>
                                             </div>
                                         )}
-                                        
                                         <div className="mt-4 p-3 bg-gray-800 rounded">
                                             <h4 className="font-medium mb-2">Памятка по кубам FATE:</h4>
                                             <ul className="text-sm space-y-1">
@@ -549,7 +522,6 @@
                                 )}
                             </div>
                         </div>
-
                         {/* Right Column */}
                         <div className="space-y-6">
                             {/* Skills Block */}
@@ -596,7 +568,6 @@
                                                 onChange={(e) => handleSkillChange(0, 4, e.target.value)}
                                                 className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
                                             />
-                                            
                                             <div className="font-medium">Отличный (+4)</div>
                                             <input 
                                                 type="text" 
@@ -628,7 +599,6 @@
                                                 onChange={(e) => handleSkillChange(1, 4, e.target.value)}
                                                 className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
                                             />
-                                            
                                             <div className="font-medium">Хороший (+3)</div>
                                             <input 
                                                 type="text" 
@@ -660,7 +630,6 @@
                                                 onChange={(e) => handleSkillChange(2, 4, e.target.value)}
                                                 className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
                                             />
-                                            
                                             <div className="font-medium">Неплохой (+2)</div>
                                             <input 
                                                 type="text" 
@@ -692,7 +661,6 @@
                                                 onChange={(e) => handleSkillChange(3, 4, e.target.value)}
                                                 className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
                                             />
-                                            
                                             <div className="font-medium">Средний (+1)</div>
                                             <input 
                                                 type="text" 
@@ -728,7 +696,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Stunts Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -749,7 +716,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Consequences Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -791,7 +757,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Inventory Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -812,7 +777,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Tokens Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -845,12 +809,16 @@
                             </div>
                         </div>
                     </div>
+                    {/* Footer */}
+                    <div className="mt-8 text-center text-xs text-gray-500">
+                        Сделал user-is-absinthe при помощи Qwen3-Max, v 0.0.17
+                    </div>
                 </div>
             );
         }
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
 </html>
+
