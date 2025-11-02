@@ -105,6 +105,18 @@
                     document.removeEventListener('mousedown', handleClickOutside);
                 };
             }, [menuOpen]);
+            // Prevent accidental page reload/navigation
+            useEffect(() => {
+                const handleBeforeUnload = (e) => {
+                    e.preventDefault();
+                    e.returnValue = 'Вы уверены, что хотите покинуть страницу? Все несохранённые изменения будут потеряны.';
+                    return e.returnValue;
+                };
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => {
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                };
+            }, []);
             const toggleSection = (section) => {
                 setExpandedSections(prev => ({
                     ...prev,
