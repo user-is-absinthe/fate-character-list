@@ -35,16 +35,48 @@
         .fate-plus { color: #10b981; }
         .fate-minus { color: #ef4444; }
         .fate-blank { color: #6b7280; }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: #1f2937;
+            color: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: auto;
+        }
+        .cropper-container {
+            position: relative;
+            display: inline-block;
+            margin-top: 1rem;
+            border: 2px dashed #4b5563;
+        }
+        .cropper-mask {
+            position: absolute;
+            pointer-events: none;
+            border: 2px solid #f59e0b;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen p-4">
     <div id="root"></div>
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
-        // Default character data from Jack_Toster — копия.txt
         const defaultCharacterData = {
           "name": "Jack Toster",
           "description": "Малютка Джек очень любил тосты с клубничным джемом. Больше тестов с джемом он любил только тестировать веб-приложения...",
+          "portrait": null, // base64 string or null
           "aspects": {
             "concept": "Рубаха-парень",
             "problem": "Ищет потерянную любовь",
@@ -72,6 +104,7 @@
           "inventory": "1. Пистоль Святого Андре\n2. Патроны (20 штук)\n3. Святая вода",
           "tokens": [true, true, true, false, false, false, false, false, false, false]
         };
+
         function App() {
             const [darkMode, setDarkMode] = useState(true);
             const [expandedSections, setExpandedSections] = useState({
@@ -93,7 +126,13 @@
             const fileInputRef = useRef(null);
             const menuRef = useRef(null);
             const [menuOpen, setMenuOpen] = useState(false);
-            // Close menu when clicking outside
+            const [showPortraitMenu, setShowPortraitMenu] = useState(false);
+            const [showCropper, setShowCropper] = useState(false);
+            const [tempImage, setTempImage] = useState(null);
+            const [cropRect, setCropRect] = useState({ x: 0, y: 0, width: 0, height: 0 });
+            const imageRef = useRef(null);
+            const containerRef = useRef(null);
+
             useEffect(() => {
                 const handleClickOutside = (event) => {
                     if (menuRef.current && !menuRef.current.contains(event.target) && menuOpen) {
@@ -105,7 +144,7 @@
                     document.removeEventListener('mousedown', handleClickOutside);
                 };
             }, [menuOpen]);
-            // Prevent accidental page reload/navigation
+
             useEffect(() => {
                 const handleBeforeUnload = (e) => {
                     e.preventDefault();
@@ -117,12 +156,14 @@
                     window.removeEventListener('beforeunload', handleBeforeUnload);
                 };
             }, []);
+
             const toggleSection = (section) => {
                 setExpandedSections(prev => ({
                     ...prev,
                     [section]: !prev[section]
                 }));
             };
+
             const handleInputChange = (field, value, subField = null) => {
                 if (subField) {
                     setCharacterData(prev => ({
@@ -139,6 +180,7 @@
                     }));
                 }
             };
+
             const handleSkillChange = (row, col, value) => {
                 const newSkills = [...characterData.skills];
                 newSkills[row][col] = value;
@@ -147,6 +189,7 @@
                     skills: newSkills
                 }));
             };
+
             const handleCheckboxChange = (type, index, checked) => {
                 if (type === 'physicalStress') {
                     const newStress = [...characterData.physicalStress];
@@ -178,6 +221,7 @@
                     }));
                 }
             };
+
             const exportToJSON = () => {
                 const dataStr = JSON.stringify(characterData, null, 2);
                 const blob = new Blob([dataStr], { type: 'application/json' });
@@ -187,10 +231,10 @@
                 linkElement.setAttribute('href', url);
                 linkElement.setAttribute('download', exportFileDefaultName);
                 linkElement.click();
-                // Clean up
                 URL.revokeObjectURL(url);
                 setMenuOpen(false);
             };
+
             const importFromJSON = (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
@@ -206,26 +250,97 @@
                 reader.readAsText(file);
                 setMenuOpen(false);
             };
+
             const toggleTheme = () => {
                 setDarkMode(!darkMode);
                 setMenuOpen(false);
             };
+
+            const removePortrait = () => {
+                setCharacterData(prev => ({ ...prev, portrait: null }));
+                setShowPortraitMenu(false);
+            };
+
+            const handlePortraitClick = () => {
+                setShowPortraitMenu(true);
+            };
+
+            const onFileSelected = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    setTempImage(ev.target.result);
+                    setShowCropper(true);
+                    setShowPortraitMenu(false);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const initCropper = () => {
+                if (!imageRef.current || !containerRef.current) return;
+                const img = imageRef.current;
+                const container = containerRef.current;
+                const imgRatio = img.naturalWidth / img.naturalHeight;
+                const targetRatio = 3 / 4;
+                let cropW, cropH;
+                if (imgRatio > targetRatio) {
+                    cropH = img.naturalHeight;
+                    cropW = cropH * targetRatio;
+                } else {
+                    cropW = img.naturalWidth;
+                    cropH = cropW / targetRatio;
+                }
+                const x = (img.naturalWidth - cropW) / 2;
+                const y = (img.naturalHeight - cropH) / 2;
+                setCropRect({ x, y, width: cropW, height: cropH });
+            };
+
+            useEffect(() => {
+                if (showCropper && tempImage) {
+                    const img = new Image();
+                    img.onload = () => {
+                        imageRef.current = img;
+                        initCropper();
+                    };
+                    img.src = tempImage;
+                }
+            }, [showCropper, tempImage]);
+
+            const applyCrop = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const { x, y, width, height } = cropRect;
+                const maxWidth = 300;
+                const maxHeight = 400;
+                canvas.width = maxWidth;
+                canvas.height = maxHeight;
+                ctx.drawImage(imageRef.current, x, y, width, height, 0, 0, maxWidth, maxHeight);
+                const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                setCharacterData(prev => ({ ...prev, portrait: base64 }));
+                setShowCropper(false);
+                setTempImage(null);
+            };
+
             const activeTokens = characterData.tokens.filter(token => token).length;
+
             const getDieDisplay = (value) => {
                 if (value === 1) return '+';
                 if (value === -1) return '-';
                 return '•';
             };
+
             const getDieClass = (value) => {
                 if (value === 1) return 'fate-plus';
                 if (value === -1) return 'fate-minus';
                 return 'fate-blank';
             };
+
             const rollDice = () => {
                 const results = [];
                 let total = 0;
                 for (let i = 0; i < diceCount; i++) {
-                    const roll = Math.floor(Math.random() * 3) - 1; // -1, 0, +1
+                    const roll = Math.floor(Math.random() * 3) - 1;
                     results.push(roll);
                     total += roll;
                 }
@@ -236,11 +351,85 @@
                     timestamp: new Date().toLocaleTimeString()
                 };
                 setCurrentRoll(rollData);
-                setRollHistory(prev => [rollData, ...prev.slice(0, 9)]); // Keep last 10 rolls
+                setRollHistory(prev => [rollData, ...prev.slice(0, 9)]);
             };
+
             return (
                 <div className={`min-h-screen p-4 ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-black'}`}>
-                    {/* Header with hamburger menu */}
+                    {/* Modals */}
+                    {showPortraitMenu && (
+                        <div className="modal-overlay" onClick={() => setShowPortraitMenu(false)}>
+                            <div className="modal" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-xl font-bold mb-4">Портрет персонажа</h2>
+                                <div className="space-y-2">
+                                    <label className="block cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                                        Загрузить изображение
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={onFileSelected}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                    {characterData.portrait && (
+                                        <button
+                                            onClick={removePortrait}
+                                            className="block w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+                                        >
+                                            Удалить изображение
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setShowPortraitMenu(false)}
+                                        className="block w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded"
+                                    >
+                                        Отмена
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showCropper && tempImage && (
+                        <div className="modal-overlay" onClick={() => setShowCropper(false)}>
+                            <div className="modal" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-xl font-bold mb-4">Обрежьте изображение (соотношение 3:4)</h2>
+                                <div className="cropper-container" ref={containerRef}>
+                                    <img
+                                        src={tempImage}
+                                        alt="preview"
+                                        style={{ maxWidth: '100%', display: 'block' }}
+                                        onLoad={initCropper}
+                                    />
+                                    <div
+                                        className="cropper-mask"
+                                        style={{
+                                            left: `${(cropRect.x / imageRef.current?.naturalWidth || 0) * 100}%`,
+                                            top: `${(cropRect.y / imageRef.current?.naturalHeight || 0) * 100}%`,
+                                            width: `${(cropRect.width / imageRef.current?.naturalWidth || 0) * 100}%`,
+                                            height: `${(cropRect.height / imageRef.current?.naturalHeight || 0) * 100}%`,
+                                        }}
+                                    ></div>
+                                </div>
+                                <div className="mt-4 space-x-2">
+                                    <button
+                                        onClick={applyCrop}
+                                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+                                    >
+                                        Применить
+                                    </button>
+                                    <button
+                                        onClick={() => setShowCropper(false)}
+                                        className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded"
+                                    >
+                                        Отмена
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Header */}
                     <div className="flex justify-between items-center mb-6">
                         <h1 className="text-3xl font-bold">FATE Core System</h1>
                         <div className="relative" ref={menuRef}>
@@ -290,11 +479,12 @@
                             )}
                         </div>
                     </div>
+
                     {/* Character Sheet */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column */}
                         <div className="space-y-6">
-                            {/* Character Block */}
+                            {/* Character Block with Portrait */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
                                     onClick={() => toggleSection('character')}
@@ -304,28 +494,48 @@
                                     <span>{expandedSections.character ? '▼' : '▶'}</span>
                                 </button>
                                 {expandedSections.character && (
-                                    <div className="p-4 space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Имя</label>
-                                            <input 
-                                                type="text" 
-                                                value={characterData.name}
-                                                onChange={(e) => handleInputChange('name', e.target.value)}
-                                                className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Описание</label>
-                                            <textarea 
-                                                rows={5}
-                                                value={characterData.description}
-                                                onChange={(e) => handleInputChange('description', e.target.value)}
-                                                className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
+                                    <div className="p-4">
+                                        <div className="flex gap-4 items-start">
+                                            <div
+                                                onClick={handlePortraitClick}
+                                                className="w-24 h-32 bg-gray-800 rounded flex-shrink-0 flex items-center justify-center cursor-pointer border-2 border-dashed border-gray-600"
+                                                style={{ aspectRatio: '3/4' }}
+                                            >
+                                                {characterData.portrait ? (
+                                                    <img
+                                                        src={characterData.portrait}
+                                                        alt="Портрет"
+                                                        className="w-full h-full object-cover rounded"
+                                                    />
+                                                ) : (
+                                                    <span className="text-gray-500 text-xs text-center px-1">Кликните для загрузки</span>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Имя</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={characterData.name}
+                                                        onChange={(e) => handleInputChange('name', e.target.value)}
+                                                        className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Описание</label>
+                                                    <textarea 
+                                                        rows={5}
+                                                        value={characterData.description}
+                                                        onChange={(e) => handleInputChange('description', e.target.value)}
+                                                        className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
+
                             {/* Aspects Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -382,6 +592,7 @@
                                     </div>
                                 )}
                             </div>
+
                             {/* Extras Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -402,6 +613,7 @@
                                     </div>
                                 )}
                             </div>
+
                             {/* Stress Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -464,6 +676,7 @@
                                     </div>
                                 )}
                             </div>
+
                             {/* Dice Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -534,6 +747,7 @@
                                 )}
                             </div>
                         </div>
+
                         {/* Right Column */}
                         <div className="space-y-6">
                             {/* Skills Block */}
@@ -548,166 +762,61 @@
                                 {expandedSections.skills && (
                                     <div className="p-4">
                                         <div className="grid grid-cols-6 gap-2">
-                                            {/* Level labels */}
                                             <div className="font-medium">Великолепн. (+5)</div>
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[0][0] || ""}
-                                                onChange={(e) => handleSkillChange(0, 0, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[0][1] || ""}
-                                                onChange={(e) => handleSkillChange(0, 1, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[0][2] || ""}
-                                                onChange={(e) => handleSkillChange(0, 2, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[0][3] || ""}
-                                                onChange={(e) => handleSkillChange(0, 3, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[0][4] || ""}
-                                                onChange={(e) => handleSkillChange(0, 4, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
+                                            {[0,1,2,3,4].map(col => (
+                                                <input 
+                                                    key={col}
+                                                    type="text" 
+                                                    value={characterData.skills[0][col] || ""}
+                                                    onChange={(e) => handleSkillChange(0, col, e.target.value)}
+                                                    className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                                                />
+                                            ))}
                                             <div className="font-medium">Отличный (+4)</div>
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[1][0] || ""}
-                                                onChange={(e) => handleSkillChange(1, 0, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[1][1] || ""}
-                                                onChange={(e) => handleSkillChange(1, 1, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[1][2] || ""}
-                                                onChange={(e) => handleSkillChange(1, 2, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[1][3] || ""}
-                                                onChange={(e) => handleSkillChange(1, 3, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[1][4] || ""}
-                                                onChange={(e) => handleSkillChange(1, 4, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
+                                            {[0,1,2,3,4].map(col => (
+                                                <input 
+                                                    key={col}
+                                                    type="text" 
+                                                    value={characterData.skills[1][col] || ""}
+                                                    onChange={(e) => handleSkillChange(1, col, e.target.value)}
+                                                    className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                                                />
+                                            ))}
                                             <div className="font-medium">Хороший (+3)</div>
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[2][0] || ""}
-                                                onChange={(e) => handleSkillChange(2, 0, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[2][1] || ""}
-                                                onChange={(e) => handleSkillChange(2, 1, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[2][2] || ""}
-                                                onChange={(e) => handleSkillChange(2, 2, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[2][3] || ""}
-                                                onChange={(e) => handleSkillChange(2, 3, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[2][4] || ""}
-                                                onChange={(e) => handleSkillChange(2, 4, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
+                                            {[0,1,2,3,4].map(col => (
+                                                <input 
+                                                    key={col}
+                                                    type="text" 
+                                                    value={characterData.skills[2][col] || ""}
+                                                    onChange={(e) => handleSkillChange(2, col, e.target.value)}
+                                                    className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                                                />
+                                            ))}
                                             <div className="font-medium">Неплохой (+2)</div>
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[3][0] || ""}
-                                                onChange={(e) => handleSkillChange(3, 0, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[3][1] || ""}
-                                                onChange={(e) => handleSkillChange(3, 1, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[3][2] || ""}
-                                                onChange={(e) => handleSkillChange(3, 2, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[3][3] || ""}
-                                                onChange={(e) => handleSkillChange(3, 3, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[3][4] || ""}
-                                                onChange={(e) => handleSkillChange(3, 4, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
+                                            {[0,1,2,3,4].map(col => (
+                                                <input 
+                                                    key={col}
+                                                    type="text" 
+                                                    value={characterData.skills[3][col] || ""}
+                                                    onChange={(e) => handleSkillChange(3, col, e.target.value)}
+                                                    className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                                                />
+                                            ))}
                                             <div className="font-medium">Средний (+1)</div>
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[4][0] || ""}
-                                                onChange={(e) => handleSkillChange(4, 0, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[4][1] || ""}
-                                                onChange={(e) => handleSkillChange(4, 1, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[4][2] || ""}
-                                                onChange={(e) => handleSkillChange(4, 2, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[4][3] || ""}
-                                                onChange={(e) => handleSkillChange(4, 3, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
-                                            <input 
-                                                type="text" 
-                                                value={characterData.skills[4][4] || ""}
-                                                onChange={(e) => handleSkillChange(4, 4, e.target.value)}
-                                                className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-                                            />
+                                            {[0,1,2,3,4].map(col => (
+                                                <input 
+                                                    key={col}
+                                                    type="text" 
+                                                    value={characterData.skills[4][col] || ""}
+                                                    onChange={(e) => handleSkillChange(4, col, e.target.value)}
+                                                    className={`p-1 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                                                />
+                                            ))}
                                         </div>
                                     </div>
                                 )}
                             </div>
+
                             {/* Stunts Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -728,6 +837,7 @@
                                     </div>
                                 )}
                             </div>
+
                             {/* Consequences Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -769,6 +879,7 @@
                                     </div>
                                 )}
                             </div>
+
                             {/* Inventory Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -789,6 +900,7 @@
                                     </div>
                                 )}
                             </div>
+
                             {/* Tokens Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -821,13 +933,15 @@
                             </div>
                         </div>
                     </div>
+
                     {/* Footer */}
                     <div className="mt-8 text-center text-xs text-gray-500">
-                        Сделал [user-is-absinthe](https://github.com/user-is-absinthe) при помощи Qwen3-Max, v 0.0.173
+                        Сделал <a href="https://github.com/user-is-absinthe" className="underline" target="_blank" rel="noopener noreferrer">user-is-absinthe</a> при помощи Qwen3-Max, v 0.0.18
                     </div>
                 </div>
             );
         }
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
