@@ -72,6 +72,10 @@
 <body class="bg-gray-900 text-white min-h-screen p-4">
     <div id="root"></div>
     <script type="text/babel">
+        // === КОНСТАНТЫ (легко изменять здесь) ===
+        const VERSION = "v 0.0.184";
+        // ========================================
+        
         const { useState, useRef, useEffect } = React;
         // Default character data from Jack_Toster.txt
         const defaultCharacterData = {
@@ -105,7 +109,6 @@
           "inventory": "1. Пистоль Святого Андре\n2. Патроны (20 штук)\n3. Святая вода",
           "tokens": [true, true, true, false, false, false, false, false, false, false]
         };
-
         function App() {
             const [darkMode, setDarkMode] = useState(true);
             const [expandedSections, setExpandedSections] = useState({
@@ -133,7 +136,6 @@
             const [cropRect, setCropRect] = useState({ x: 0, y: 0, width: 0, height: 0 });
             const imageRef = useRef(null);
             const containerRef = useRef(null);
-
             useEffect(() => {
                 const handleClickOutside = (event) => {
                     if (menuRef.current && !menuRef.current.contains(event.target) && menuOpen) {
@@ -145,7 +147,6 @@
                     document.removeEventListener('mousedown', handleClickOutside);
                 };
             }, [menuOpen]);
-
             useEffect(() => {
                 const handleBeforeUnload = (e) => {
                     e.preventDefault();
@@ -157,14 +158,12 @@
                     window.removeEventListener('beforeunload', handleBeforeUnload);
                 };
             }, []);
-
             const toggleSection = (section) => {
                 setExpandedSections(prev => ({
                     ...prev,
                     [section]: !prev[section]
                 }));
             };
-
             const handleInputChange = (field, value, subField = null) => {
                 if (subField) {
                     setCharacterData(prev => ({
@@ -181,7 +180,6 @@
                     }));
                 }
             };
-
             const handleSkillChange = (row, col, value) => {
                 const newSkills = [...characterData.skills];
                 newSkills[row][col] = value;
@@ -190,7 +188,6 @@
                     skills: newSkills
                 }));
             };
-
             const handleCheckboxChange = (type, index, checked) => {
                 if (type === 'physicalStress') {
                     const newStress = [...characterData.physicalStress];
@@ -222,7 +219,6 @@
                     }));
                 }
             };
-
             const exportToJSON = () => {
                 const dataStr = JSON.stringify(characterData, null, 2);
                 const blob = new Blob([dataStr], { type: 'application/json' });
@@ -235,7 +231,6 @@
                 URL.revokeObjectURL(url);
                 setMenuOpen(false);
             };
-
             const importFromJSON = (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
@@ -251,21 +246,17 @@
                 reader.readAsText(file);
                 setMenuOpen(false);
             };
-
             const toggleTheme = () => {
                 setDarkMode(!darkMode);
                 setMenuOpen(false);
             };
-
             const removePortrait = () => {
                 setCharacterData(prev => ({ ...prev, portrait: null }));
                 setShowPortraitMenu(false);
             };
-
             const handlePortraitClick = () => {
                 setShowPortraitMenu(true);
             };
-
             const onFileSelected = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -277,7 +268,6 @@
                 };
                 reader.readAsDataURL(file);
             };
-
             const initCropper = () => {
                 if (!imageRef.current || !containerRef.current) return;
                 const img = imageRef.current;
@@ -295,7 +285,6 @@
                 const y = (img.naturalHeight - cropH) / 2;
                 setCropRect({ x, y, width: cropW, height: cropH });
             };
-
             useEffect(() => {
                 if (showCropper && tempImage) {
                     const img = new Image();
@@ -306,7 +295,6 @@
                     img.src = tempImage;
                 }
             }, [showCropper, tempImage]);
-
             const applyCrop = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
@@ -321,21 +309,17 @@
                 setShowCropper(false);
                 setTempImage(null);
             };
-
             const activeTokens = characterData.tokens.filter(token => token).length;
-
             const getDieDisplay = (value) => {
                 if (value === 1) return '+';
                 if (value === -1) return '-';
                 return '•';
             };
-
             const getDieClass = (value) => {
                 if (value === 1) return 'fate-plus';
                 if (value === -1) return 'fate-minus';
                 return 'fate-blank';
             };
-
             const rollDice = () => {
                 const results = [];
                 let total = 0;
@@ -353,7 +337,6 @@
                 setCurrentRoll(rollData);
                 setRollHistory(prev => [rollData, ...prev.slice(0, 9)]);
             };
-
             return (
                 <div className={`min-h-screen p-4 ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-black'}`}>
                     {/* Modals */}
@@ -389,7 +372,6 @@
                             </div>
                         </div>
                     )}
-
                     {showCropper && tempImage && (
                         <div className="modal-overlay" onClick={() => setShowCropper(false)}>
                             <div className="modal" onClick={e => e.stopPropagation()}>
@@ -428,7 +410,6 @@
                             </div>
                         </div>
                     )}
-
                     {/* Header */}
                     <div className="flex justify-between items-center mb-6">
                         <h1 className="text-3xl font-bold">FATE Core System</h1>
@@ -474,12 +455,14 @@
                                         >
                                             GitHub проекта
                                         </a>
+                                        <div className="block px-4 py-2 text-xs text-gray-400">
+                                            {VERSION}
+                                        </div>
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
-
                     {/* Character Sheet */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column */}
@@ -535,7 +518,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Aspects Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -592,7 +574,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Extras Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -613,7 +594,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Stress Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -676,7 +656,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Dice Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -747,7 +726,6 @@
                                 )}
                             </div>
                         </div>
-
                         {/* Right Column */}
                         <div className="space-y-6">
                             {/* Skills Block */}
@@ -816,7 +794,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Stunts Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -837,7 +814,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Consequences Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -879,7 +855,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Inventory Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -900,7 +875,6 @@
                                     </div>
                                 )}
                             </div>
-
                             {/* Tokens Block */}
                             <div className={`rounded-md border ${darkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                                 <button 
@@ -933,18 +907,15 @@
                             </div>
                         </div>
                     </div>
-
                     {/* Footer */}
                     <div className="mt-8 text-center text-xs text-gray-500">
-                        Сделал <a href="https://github.com/user-is-absinthe" className="underline" target="_blank" rel="noopener noreferrer">user-is-absinthe</a> при помощи Qwen3-Max, v 0.0.182
+                        Сделал <a href="https://github.com/user-is-absinthe" className="underline" target="_blank" rel="noopener noreferrer">user-is-absinthe</a> при помощи семейства моделей Qwen, {VERSION}
                     </div>
                 </div>
             );
         }
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
 </html>
-
